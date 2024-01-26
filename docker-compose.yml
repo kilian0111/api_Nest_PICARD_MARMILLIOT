@@ -1,0 +1,49 @@
+version: "3"
+services:
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    networks:
+      - app-network
+    volumes:
+      - ./data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=ObiJuan
+      - MONGO_INITDB_ROOT_PASSWORD=ObiJuan
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    ports:
+      - "8081:8081"
+    networks:
+      - app-network
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=ObiJuan
+      - ME_CONFIG_BASICAUTH_PASSWORD=ObiJuan
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=ObiJuan
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=ObiJuan
+    depends_on:
+      - mongodb
+
+  nodejs-app:
+    build: .
+    container_name: nodejs-app
+    ports:
+      - "80:80"
+      - "3000:3000"
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+
+networks:
+  app-network:
+    driver: bridge
