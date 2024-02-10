@@ -8,17 +8,28 @@ import * as bcrypt from 'bcrypt';
 export class UserService {
   constructor(@InjectModel('User') private readonly UserModule: Model<User>) {}
   async create(user: User): Promise<User> {
-    user.password = await this.hashPassword(user.password);
-    return await this.UserModule.create(user);
-
+    try {
+      user.password = await this.hashPassword(user.password);
+      return await this.UserModule.create(user);
+    } catch (error) {
+      throw new HttpException('erreur', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   async findAll(): Promise<User[]> {
-    return this.UserModule.find({ isDeleted: false }, { password: 0 });
+    try {
+      return this.UserModule.find({ isDeleted: false }, { password: 0 });
+    } catch (error) {
+        throw new HttpException('erreur', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
-  findOne(id: string): Promise<User> {
-    return this.UserModule.findOne({ _id: id, isDeleted: false }, { password: 0 });
+  async findOne(id: string): Promise<User> {
+   const user: User | null = await this.UserModule.findById(id, { password: 0 });
+    if (!user || user.isDeleted) {
+      throw new HttpException('aucun user', HttpStatus.NOT_FOUND);
+    }
+    return user;
   }
 
   async remove(id: string) {
@@ -26,35 +37,33 @@ export class UserService {
       throw new HttpException('aucun user', HttpStatus.NOT_FOUND);
     }
     await this.UserModule.updateOne(
-      { _id: id },
-      {
-        isDeleted: true,
-        firstname: 'unknown',
-        lastname: 'unknown',
-        email: 'unknown',
-        password: 'unknown',
-      },
+        { _id: id },
+        {
+          isDeleted: true,
+          firstname: 'unknown',
+          lastname: 'unknown',
+          email: 'unknown',
+          password: 'unknown',
+        },
     );
   }
 
   async update(id: string, user: User): Promise<User> {
-    if (user._id) {
-      delete user._id;
-    }
-    const userToModify: User[] = await this.UserModule.find({
-      _id: id,
-      isDeleted: false,
-    });
-    if (!userToModify && userToModify.length === 0) {
-      throw new HttpException('aucun user', HttpStatus.NOT_FOUND);
-    }
-    if (user.password) {
-      user.password = await this.hashPassword(user.password);
-    }
 
-    await this.UserModule.updateOne({ _id: id }, user);
-    return this.UserModule.findById(id);
+      if (user._id) {
+        delete user._id;
+      }
+      const userToModify: User = await this.UserModule.findById(id, { password: 0 })
+      if (!userToModify || userToModify.isDeleted) {
+        throw new HttpException('aucun user', HttpStatus.NOT_FOUND);
+      }
+      if (user.password) {
+        user.password = await this.hashPassword(user.password);
+      }
+      await this.UserModule.updateOne({ _id: id }, user);
+      return this.UserModule.findById(id);
   }
+
 
   async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
